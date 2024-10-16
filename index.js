@@ -62,8 +62,8 @@ app.post('/api/events', upload.single('image'), async (req, res) => {
   try {
     // Compress the image using sharp
     const compressedImage = await sharp(req.file.buffer)
-      .resize({ width: 800 }) // Resize the image to 800px width, maintain aspect ratio
-      .jpeg({ quality: 80 }) // Convert to JPEG and set quality to 80%
+      .resize({ width: 800 }) 
+      .jpeg({ quality: 80 })
       .toBuffer();
 
     // Upload the compressed image to GridFS
@@ -175,7 +175,7 @@ app.post('/login', async (req, res) => {
       );
       res.json({ token });
     } else {
-      res.status(401).json({ message: 'Authentication failed' });
+      res.status(401).json({ message: 'Email or Password is not currect' });
     }
   } catch (err) {
     console.error('Error during login:', err);
@@ -185,12 +185,11 @@ app.post('/login', async (req, res) => {
 const bookingSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   eventId: { type: mongoose.Schema.Types.ObjectId, ref: 'Event' },
-  // Add any additional fields you need
+ 
 });
 
 const Booking = mongoose.model('Booking', bookingSchema);
 
-// API route to handle booking
 app.post('/api/book/:eventId', async (req, res) => {
   const token = req.headers.authorization?.split(' ')[1];
   
@@ -203,11 +202,16 @@ app.post('/api/book/:eventId', async (req, res) => {
     const userId = decoded.userId;
     const eventId = req.params.eventId;
 
-    // Create a new booking
+    // Check if the booking already exists for this user and event
+    const existingBooking = await Booking.findOne({ userId, eventId });
+    if (existingBooking) {
+      return res.status(400).json({ message: 'Event is already in your wishlist' });
+    }
+
+    // Create a new booking if it doesn't exist
     const booking = new Booking({
       userId,
       eventId
-      // Add additional fields if necessary
     });
 
     await booking.save();
@@ -217,6 +221,7 @@ app.post('/api/book/:eventId', async (req, res) => {
     res.status(500).json({ message: 'Internal server error', error: err.message });
   }
 });
+
  // Get bookings for the logged-in user
 app.get('/api/bookings', async (req, res) => {
   const token = req.headers.authorization?.split(' ')[1];
@@ -250,10 +255,9 @@ app.get('/api/user/events', async (req, res) => {
     const decoded = jwt.verify(token, jwtSecret);
     const userId = decoded.userId;
 
-    // Find bookings for this user and populate eventId
+   
     const bookings = await Booking.find({ userId }).populate('eventId');
 
-    // Extract event details from bookings
     const userEvents = bookings.map(booking => {
       return {
         eventId: booking.eventId._id,
@@ -299,9 +303,18 @@ app.delete('/api/user/events/:eventId', async (req, res) => {
     res.status(500).json({ message: 'Internal server error', error: err.message });
   }
 });
+app.delete('/api/events/:id', async (req, res) => {
+  try {
+    const eventId = req.params.id;
+    await EventModel.findByIdAndDelete(eventId);
+    res.status(200).send({ message: 'Event deleted successfully' });
+  } catch (error) {
+    res.status(500).send({ message: 'Error deleting event' });
+  }
+});
 
 
-// Fetch User Profile and Booked Events
+
 
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
